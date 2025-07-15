@@ -1,3 +1,6 @@
+import { bold } from "jsr:@std/internal@^1.0.6/styles";
+import HTTP from "./http.ts";
+
 const now = new Date().toLocaleTimeString();
 console.log(
   `[${now}] 🔁 Server restarted and running on http://localhost:8080`,
@@ -27,19 +30,7 @@ async function handleConnection(conn: Deno.Conn) {
         buffer.subarray(0, bufferRead),
       );
       console.log("Received request:\n", requestText);
-
-      const [requestLine, ...headerLines] = requestText.split("\r\n");
-      const headerMap = headerLines.filter((headerLine) =>
-        headerLine.includes(":")
-      )
-        .reduce<Record<string, string>>((map, headerLine) => {
-          const [rawName, ...rest] = headerLine.split(":");
-          const name = rawName.trim().toLocaleLowerCase();
-          const value = rest.join(":").trim();
-          map[name] = value;
-          return map;
-        }, {});
-      const [method, path] = requestLine.split(" ");
+      const { method, path, headers } = HTTP.parseRequest(requestText);
 
       let responseBody: string;
       let statusLine = "HTTP/1.1 200 OK";
@@ -59,17 +50,18 @@ async function handleConnection(conn: Deno.Conn) {
           statusLine = "HTTP/1.1 404 Not Found";
           responseBody = "404 Not Found";
       }
-      const httpResponse = [
+      const httpResponse = HTTP.buildResponse(
         statusLine,
-        "Context-Type: text/plain",
-        `Content-Length: ${responseBody.length}`,
-        "",
+        {
+          "content-type": "text/plain",
+          "content-length": responseBody.length.toString(),
+          connection: headers["connection"] || "",
+        },
         responseBody,
-      ].join("\r\n");
+      );
+      await conn.write(httpResponse);
 
-      await conn.write(new TextEncoder().encode(httpResponse));
-
-      const connectionHeader = headerMap["connection"] ?? "";
+      const connectionHeader = headers["connection"] ?? "";
       console.log({ connectionHeader });
       if (connectionHeader.toLocaleLowerCase() !== "keep-alive") {
         conn.close();
