@@ -22,18 +22,38 @@ async function handleConnection(conn: Deno.Conn) {
   }
 
   const requestText = new TextDecoder().decode(buffer.subarray(0, bufferRead));
-  console.log("Received request:", requestText);
+  console.log("Received request:\n", requestText);
 
-  const body = "Your first Server is running!";
+  const [requestLine, ...headers] = requestText.split("\r\n");
+  const [method, path] = requestLine.split(" ");
+
+  let responseBody: string;
+  let statusLine = "HTTP/1.1 200 OK";
+
+  switch (path) {
+    case "/":
+      responseBody = "Here is root";
+      break;
+    case "/tokyo":
+      responseBody = "Here is Tokyo";
+      break;
+    case "/Osaka":
+      responseBody = "Here is Osaka";
+      break;
+
+    default:
+      statusLine = "HTTP/1.1 404 Not Found";
+      responseBody = "404 Not Found";
+  }
   const httpResponse = [
-    "HTTP/1.1 200 OK",
+    statusLine,
     "Context-Type: text/plain",
-    `Content-Length: ${body.length}`,
+    `Content-Length: ${responseBody.length}`,
     "",
-    body,
+    responseBody,
   ].join("\r\n");
 
   await conn.write(new TextEncoder().encode(httpResponse));
   conn.close();
-  console.log("Response sent and connection closed");
+  console.log(`Response sent for ${method} ${path} with status ${statusLine}`);
 }
