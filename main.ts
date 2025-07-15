@@ -1,10 +1,23 @@
-import { bold } from "jsr:@std/internal@^1.0.6/styles";
 import HTTP from "./http.ts";
+import { Router } from "./router.ts";
 
 const now = new Date().toLocaleTimeString();
 console.log(
   `[${now}] 🔁 Server restarted and running on http://localhost:8080`,
 );
+
+const router = new Router();
+router.get("/", () => ({
+  statusLine: "HTTP/1.1 200 OK",
+  headers: { "content-type": "text/plain" },
+  body: "What's up here's root",
+}));
+
+router.get("/tokyo", () => ({
+  statusLine: "HTTP/1.1 200 OK",
+  headers: { "content-type": "text/plain" },
+  body: "What's up here's Tokyo",
+}));
 
 const listener = Deno.listen({ port: 8080 });
 console.log("HTTP server is running on http://localhost:8080");
@@ -31,35 +44,20 @@ async function handleConnection(conn: Deno.Conn) {
       );
       console.log("Received request:\n", requestText);
       const { method, path, headers } = HTTP.parseRequest(requestText);
-
-      let responseBody: string;
-      let statusLine = "HTTP/1.1 200 OK";
-
-      switch (path) {
-        case "/":
-          responseBody = "Here is root";
-          break;
-        case "/tokyo":
-          responseBody = "Here is Tokyo";
-          break;
-        case "/osaka":
-          responseBody = "Here is Osaka";
-          break;
-
-        default:
-          statusLine = "HTTP/1.1 404 Not Found";
-          responseBody = "404 Not Found";
-      }
-      const httpResponse = HTTP.buildResponse(
-        statusLine,
-        {
-          "content-type": "text/plain",
-          "content-length": responseBody.length.toString(),
-          connection: headers["connection"] || "",
-        },
-        responseBody,
+      const { statusLine, headers: resHeaders, body: resBody } = router.handle(
+        method,
+        path,
+        headers,
       );
-      await conn.write(httpResponse);
+
+      resHeaders["content-length"] = resBody.length.toString();
+
+      const responseBytes = HTTP.buildResponse(
+        statusLine,
+        resHeaders,
+        resBody,
+      );
+      await conn.write(responseBytes);
 
       const connectionHeader = headers["connection"] ?? "";
       console.log({ connectionHeader });
