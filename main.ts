@@ -98,6 +98,6 @@ async function handleConnection(conn: Deno.Conn) {
       }
     }
   } finally {
-    conn.close();
+    // conn.close();
   }
 }
