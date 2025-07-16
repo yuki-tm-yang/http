@@ -92,12 +92,6 @@ async function handleConnection(conn: Deno.Conn) {
           `Response sent for ${method} ${path} with status ${statusLine}`,
         );
       }
-
-      const connectionHeader = headers["connection"] ?? "";
-      if (connectionHeader.toLocaleLowerCase() !== "keep-alive") {
-        conn.close();
-        break;
-      }
     }
   } finally {
     conn.close();
