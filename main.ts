@@ -1,5 +1,6 @@
 import HTTP from "./http.ts";
 import { Router } from "./router.ts";
+import { getMimeType } from "./utils.ts";
 
 const now = new Date().toLocaleTimeString();
 console.log(
@@ -18,6 +19,10 @@ router.get("/tokyo", () => ({
   headers: { "content-type": "text/plain" },
   body: "What's up here's Tokyo",
 }));
+
+router.get("/html", () => "index.html");
+router.get("/styles.css", () => "styles.css");
+router.get("/script.js", () => "script.js");
 
 const listener = Deno.listen({ port: 8080 });
 console.log("HTTP server is running on http://localhost:8080");
@@ -43,21 +48,52 @@ async function handleConnection(conn: Deno.Conn) {
         buffer.subarray(0, bufferRead),
       );
       console.log("Received request:\n", requestText);
-      const { method, path, headers } = HTTP.parseRequest(requestText);
-      const { statusLine, headers: resHeaders, body: resBody } = router.handle(
-        method,
-        path,
-        headers,
-      );
 
-      resHeaders["content-length"] = resBody.length.toString();
+      const parsedRequestText = HTTP.parseRequest(requestText);
+      const { method, path, headers } = parsedRequestText;
 
-      const responseBytes = HTTP.buildResponse(
-        statusLine,
-        resHeaders,
-        resBody,
-      );
-      await conn.write(responseBytes);
+      let responseBytes: Uint8Array;
+      const maybePath = router.handle(method, path, headers);
+
+      if (typeof maybePath === "string") {
+        const filePath = `./public/${maybePath}`;
+        try {
+          const data = await Deno.readFile(filePath);
+          const extention = maybePath.slice(maybePath.lastIndexOf("."));
+          const mimeType = getMimeType(extention);
+          responseBytes = HTTP.buildResponse(
+            "HTTP/1.1 200 OK",
+            {
+              "content-type": mimeType,
+              "content-length": data.byteLength.toString(),
+            },
+            "",
+          );
+
+          await conn.write(responseBytes);
+          await conn.write(data);
+        } catch {
+          responseBytes = HTTP.buildResponse(
+            "HTTP/1.1 404 Not Found",
+            { "content-type": "text/plain" },
+            "404 Not Found",
+          );
+          await conn.write(responseBytes);
+        }
+      } else {
+        const { statusLine, headers: resHeaders, body: resBody } = maybePath;
+        resHeaders["content-length"] = resBody.length.toString();
+
+        responseBytes = HTTP.buildResponse(
+          statusLine,
+          resHeaders,
+          resBody,
+        );
+        await conn.write(responseBytes);
+        console.log(
+          `Response sent for ${method} ${path} with status ${statusLine}`,
+        );
+      }
 
       const connectionHeader = headers["connection"] ?? "";
       console.log({ connectionHeader });
@@ -65,9 +101,6 @@ async function handleConnection(conn: Deno.Conn) {
         conn.close();
         break;
       }
-      console.log(
-        `Response sent for ${method} ${path} with status ${statusLine}`,
-      );
     }
   } finally {
     conn.close();

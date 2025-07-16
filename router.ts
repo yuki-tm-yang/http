@@ -1,13 +1,14 @@
+type HandlerResult = {
+  statusLine: string;
+  headers: Record<string, string>;
+  body: string;
+} | string;
 export type Handler = (params: {
   method: string;
   path: string;
   headers: Record<string, string>;
   body?: string;
-}) => {
-  statusLine: string;
-  headers: Record<string, string>;
-  body: string;
-};
+}) => HandlerResult;
 
 interface RouterEntry {
   method: string;
