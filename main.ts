@@ -49,6 +49,10 @@ async function handleConnection(conn: Deno.Conn) {
 
       const parsedRequestText = HTTP.parseRequest(requestText);
       const { method, path, headers } = parsedRequestText;
+      if (method === "PRI" && path === "*") {
+        console.log("PRI");
+        break;
+      }
 
       let responseBytes: Uint8Array;
       const maybePath = router.handle(method, path, headers);
