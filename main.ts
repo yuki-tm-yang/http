@@ -33,11 +33,10 @@ for await (const conn of listener) {
 
 async function handleConnection(conn: Deno.Conn) {
   const buffer = new Uint8Array(1024);
-  console.log({ buffer });
+
   try {
     while (true) {
       const bufferRead = await conn.read(buffer);
-      console.log({ bufferRead });
 
       if (bufferRead === null) {
         console.log("Connection closed");
@@ -47,7 +46,6 @@ async function handleConnection(conn: Deno.Conn) {
       const requestText = new TextDecoder().decode(
         buffer.subarray(0, bufferRead),
       );
-      console.log("Received request:\n", requestText);
 
       const parsedRequestText = HTTP.parseRequest(requestText);
       const { method, path, headers } = parsedRequestText;
@@ -96,7 +94,6 @@ async function handleConnection(conn: Deno.Conn) {
       }
 
       const connectionHeader = headers["connection"] ?? "";
-      console.log({ connectionHeader });
       if (connectionHeader.toLocaleLowerCase() !== "keep-alive") {
         conn.close();
         break;
